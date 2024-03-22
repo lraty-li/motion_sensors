@@ -19,6 +19,9 @@ class _MyAppState extends State<MyApp> {
   Vector3 _orientation = Vector3.zero();
   Vector3 _absoluteOrientation = Vector3.zero();
   Vector3 _absoluteOrientation2 = Vector3.zero();
+  Vector4 _rotationVector = Vector4.zero();
+  Vector4 _gameRotationVector = Vector4.zero();
+
   double? _screenOrientation = 0;
 
   int? _groupValue = 0;
@@ -62,6 +65,19 @@ class _MyAppState extends State<MyApp> {
         _absoluteOrientation.setValues(event.yaw, event.pitch, event.roll);
       });
     });
+
+    motionSensors.gameRotationVector.listen((GameRotationVectorEvent event) {
+      setState(() {
+        _gameRotationVector.setValues(event.x, event.y, event.z, event.cosTheta);
+      });
+    });
+
+    motionSensors.rotationVector.listen((RotationVectorEvent event) {
+      setState(() {
+      _rotationVector.setValues(event.x, event.y, event.z, event.cosTheta);
+      });
+    });
+
     motionSensors.screenOrientation.listen((ScreenOrientationEvent event) {
       setState(() {
         _screenOrientation = event.angle;
@@ -76,6 +92,8 @@ class _MyAppState extends State<MyApp> {
     motionSensors.magnetometerUpdateInterval = interval;
     motionSensors.orientationUpdateInterval = interval;
     motionSensors.absoluteOrientationUpdateInterval = interval;
+    motionSensors.rotationVectorUpdateInterval = interval;
+    motionSensors.gameRotationVectorUpdateInterval = interval;
     setState(() {
       _groupValue = groupValue;
     });
@@ -177,6 +195,26 @@ class _MyAppState extends State<MyApp> {
                   Text('${degrees(_absoluteOrientation2.x).toStringAsFixed(4)}'),
                   Text('${degrees(_absoluteOrientation2.y).toStringAsFixed(4)}'),
                   Text('${degrees(_absoluteOrientation2.z).toStringAsFixed(4)}'),
+                ],
+              ),
+              Text('Rotation Vector'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: <Widget>[
+                  Text('${_rotationVector.x.toStringAsFixed(4)}'),
+                  Text('${_rotationVector.y.toStringAsFixed(4)}'),
+                  Text('${_rotationVector.y.toStringAsFixed(4)}'),
+                  Text('${_rotationVector.w.toStringAsFixed(4)}'),
+                ],
+              ),
+              Text('Game Rotation Vector'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: <Widget>[
+                  Text('${_gameRotationVector.x.toStringAsFixed(4)}'),
+                  Text('${_gameRotationVector.y.toStringAsFixed(4)}'),
+                  Text('${_gameRotationVector.y.toStringAsFixed(4)}'),
+                  Text('${_gameRotationVector.w.toStringAsFixed(4)}'),
                 ],
               ),
               Text('Screen Orientation'),

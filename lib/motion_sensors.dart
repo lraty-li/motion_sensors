@@ -11,6 +11,8 @@ const EventChannel _magnetometerEventChannel = EventChannel('motion_sensors/magn
 const EventChannel _userAccelerometerEventChannel = EventChannel('motion_sensors/user_accelerometer');
 const EventChannel _orientationChannel = EventChannel('motion_sensors/orientation');
 const EventChannel _absoluteOrientationChannel = EventChannel('motion_sensors/absolute_orientation');
+const EventChannel _rotationVectorChannel = EventChannel('motion_sensors/rotation_vector');
+const EventChannel _gameRotationVectorChannel = EventChannel('motion_sensors/game_rotation_vector');
 const EventChannel _screenOrientationChannel = EventChannel('motion_sensors/screen_orientation');
 
 // from https://github.com/flutter/plugins/tree/master/packages/sensors
@@ -135,6 +137,44 @@ class UserAccelerometerEvent {
   String toString() => '[UserAccelerometerEvent (x: $x, y: $y, z: $z)]';
 }
 
+class RotationVectorEvent {
+  RotationVectorEvent(this.x, this.y, this.z, this.cosTheta, this.accuracy);
+  RotationVectorEvent.fromList(List<double> list)
+      : x = list[0],
+        y = list[1],
+        z = list[2],
+        cosTheta = list[3],
+        accuracy = list.length == 5 ? list[4] : -1;
+
+  final double x;
+  final double y;
+  final double z;
+  final double cosTheta;
+  final double accuracy;
+
+  @override
+  String toString() => '[Rotation Vector (x*sin(theta/2): $x, y*sin(theta/2): $y, zsin(theta/2): $z, cos(theta/2): $cosTheta), accuraty: $accuracy]';
+}
+
+class GameRotationVectorEvent {
+  GameRotationVectorEvent(this.x, this.y, this.z, this.cosTheta, this.accuracy);
+  GameRotationVectorEvent.fromList(List<double> list)
+      : x = list[0],
+        y = list[1],
+        z = list[2],
+        cosTheta = list[3],
+        accuracy = list.length == 5 ? list[4] : -1;
+
+  final double x;
+  final double y;
+  final double z;
+  final double cosTheta;
+  final double accuracy;
+
+  @override
+  String toString() => '[Game Rotation Vector (x*sin(theta/2): $x, y*sin(theta/2): $y, zsin(theta/2): $z, cos(theta/2): $cosTheta), accuraty: $accuracy]';
+}
+
 class OrientationEvent {
   OrientationEvent(this.yaw, this.pitch, this.roll);
   OrientationEvent.fromList(List<double> list)
@@ -190,6 +230,8 @@ class MotionSensors {
   Stream<MagnetometerEvent>? _magnetometerEvents;
   Stream<OrientationEvent>? _orientationEvents;
   Stream<AbsoluteOrientationEvent>? _absoluteOrientationEvents;
+  Stream<RotationVectorEvent>? _rotationVectorEvents;
+  Stream<GameRotationVectorEvent>? _gameRotationVectorEvents;
   Stream<ScreenOrientationEvent>? _screenOrientationEvents;
   OrientationEvent? _initialOrientation;
 
@@ -197,8 +239,10 @@ class MotionSensors {
   static const int TYPE_MAGNETIC_FIELD = 2;
   static const int TYPE_GYROSCOPE = 4;
   static const int TYPE_USER_ACCELEROMETER = 10;
-  static const int TYPE_ORIENTATION = 15; //=TYPE_GAME_ROTATION_VECTOR
-  static const int TYPE_ABSOLUTE_ORIENTATION = 11; //=TYPE_ROTATION_VECTOR
+  static const int TYPE_ORIENTATION = 3; 
+  static const int TYPE_ABSOLUTE_ORIENTATION = 3; //=TYPE_ORIENTATION
+  static const int TYPE_ROTATION_VECTOR = 11;
+  static const int TYPE_GAME_ROTATION_VECTOR = 15;
 
   /// Determines whether sensor is available.
   Future<bool> isSensorAvailable(int sensorType) async {
@@ -246,6 +290,12 @@ class MotionSensors {
 
   /// The update interval of absolute orientation. The units are in microseconds.
   set absoluteOrientationUpdateInterval(int interval) => setSensorUpdateInterval(TYPE_ABSOLUTE_ORIENTATION, interval);
+  
+  /// The update interval of absolute orientation. The units are in microseconds.
+  set rotationVectorUpdateInterval(int interval) => setSensorUpdateInterval(TYPE_ROTATION_VECTOR, interval);
+
+  /// The update interval of absolute orientation. The units are in microseconds.
+  set gameRotationVectorUpdateInterval(int interval) => setSensorUpdateInterval(TYPE_GAME_ROTATION_VECTOR, interval);
 
   /// A broadcast stream of events from the device accelerometer.
   Stream<AccelerometerEvent> get accelerometer {
@@ -299,6 +349,22 @@ class MotionSensors {
       _absoluteOrientationEvents = _absoluteOrientationChannel.receiveBroadcastStream().map((dynamic event) => AbsoluteOrientationEvent.fromList(event.cast<double>()));
     }
     return _absoluteOrientationEvents!;
+  }
+
+  /// The rotation vector represents the orientation of the device as a combination of an angle and an axis, in which the device has rotated through an angle θ around an axis <x, y, z>.
+  Stream<RotationVectorEvent> get rotationVector {
+    if (_rotationVectorEvents == null) {
+      _rotationVectorEvents = _rotationVectorChannel.receiveBroadcastStream().map((dynamic event) => RotationVectorEvent.fromList(event.cast<double>()));
+    }
+    return _rotationVectorEvents!;
+  }
+
+  /// Identical to Sensor.TYPE_ROTATION_VECTOR except that it doesn't use the geomagnetic field. Therefore the Y axis doesn't point north, but instead to some other reference, that reference is allowed to drift by the same order of magnitude as the gyroscope drift around the Z axis.
+  Stream<GameRotationVectorEvent> get gameRotationVector {
+    if (_gameRotationVectorEvents == null) {
+      _gameRotationVectorEvents = _gameRotationVectorChannel.receiveBroadcastStream().map((dynamic event) => GameRotationVectorEvent.fromList(event.cast<double>()));
+    }
+    return _gameRotationVectorEvents!;
   }
 
   /// The rotation of the screen from its "natural" orientation.

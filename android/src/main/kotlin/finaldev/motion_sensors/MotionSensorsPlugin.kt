@@ -25,6 +25,8 @@ public class MotionSensorsPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
   private val USER_ACCELEROMETER_CHANNEL_NAME = "motion_sensors/user_accelerometer"
   private val ORIENTATION_CHANNEL_NAME = "motion_sensors/orientation"
   private val ABSOLUTE_ORIENTATION_CHANNEL_NAME = "motion_sensors/absolute_orientation"
+  private val ROTATION_VECTOR_CHANNEL_NAME = "motion_sensors/rotation_vector"
+  private val GAME_ROTATION_VECTOR_CHANNEL_NAME = "motion_sensors/game_rotation_vector"
   private val SCREEN_ORIENTATION_CHANNEL_NAME = "motion_sensors/screen_orientation"
 
   private var sensorManager: SensorManager? = null
@@ -35,6 +37,8 @@ public class MotionSensorsPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
   private var userAccelerometerChannel: EventChannel? = null
   private var orientationChannel: EventChannel? = null
   private var absoluteOrientationChannel: EventChannel? = null
+  private var rotationVectorChannel: EventChannel? = null
+  private var gameRotationVectorChannel: EventChannel? = null
   private var screenOrientationChannel: EventChannel? = null
 
 
@@ -42,8 +46,10 @@ public class MotionSensorsPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
   private var gyroScopeStreamHandler: StreamHandlerImpl? = null
   private var magnetometerStreamHandler: StreamHandlerImpl? = null
   private var userAccelerationStreamHandler: StreamHandlerImpl? = null
-  private var orientationStreamHandler: RotationVectorStreamHandler? = null
-  private var absoluteOrientationStreamHandler: RotationVectorStreamHandler? = null
+  private var rotationVectorStreamHandler: RotationVectorStreamHandler? = null
+  private var gameRotationVectorStreamHandler: RotationVectorStreamHandler? = null
+  private var orientationStreamHandler: OrientationStreamHandler? = null
+  private var absoluteOrientationStreamHandler: OrientationStreamHandler? = null
   private var screenOrientationStreamHandler: ScreenOrientationStreamHandler? = null
 
   companion object {
@@ -95,12 +101,20 @@ public class MotionSensorsPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
     magnetometerChannel!!.setStreamHandler(magnetometerStreamHandler!!)
 
     orientationChannel = EventChannel(messenger, ORIENTATION_CHANNEL_NAME)
-    orientationStreamHandler = RotationVectorStreamHandler(sensorManager!!, Sensor.TYPE_GAME_ROTATION_VECTOR)
+    orientationStreamHandler = OrientationStreamHandler(sensorManager!!, Sensor.TYPE_GAME_ROTATION_VECTOR)
     orientationChannel!!.setStreamHandler(orientationStreamHandler!!)
 
     absoluteOrientationChannel = EventChannel(messenger, ABSOLUTE_ORIENTATION_CHANNEL_NAME)
-    absoluteOrientationStreamHandler = RotationVectorStreamHandler(sensorManager!!, Sensor.TYPE_ROTATION_VECTOR)
+    absoluteOrientationStreamHandler = OrientationStreamHandler(sensorManager!!, Sensor.TYPE_ROTATION_VECTOR)
     absoluteOrientationChannel!!.setStreamHandler(absoluteOrientationStreamHandler!!)
+
+    rotationVectorChannel = EventChannel(messenger, ROTATION_VECTOR_CHANNEL_NAME)
+    rotationVectorStreamHandler = RotationVectorStreamHandler(sensorManager!!, Sensor.TYPE_ROTATION_VECTOR)
+    rotationVectorChannel!!.setStreamHandler(rotationVectorStreamHandler!!)
+
+    gameRotationVectorChannel = EventChannel(messenger, GAME_ROTATION_VECTOR_CHANNEL_NAME)
+    gameRotationVectorStreamHandler = RotationVectorStreamHandler(sensorManager!!, Sensor.TYPE_ROTATION_VECTOR)
+    gameRotationVectorChannel!!.setStreamHandler(gameRotationVectorStreamHandler!!)
 
     screenOrientationChannel = EventChannel(messenger, SCREEN_ORIENTATION_CHANNEL_NAME)
     screenOrientationStreamHandler = ScreenOrientationStreamHandler(context, sensorManager!!, Sensor.TYPE_ACCELEROMETER)
@@ -124,8 +138,9 @@ public class MotionSensorsPlugin : FlutterPlugin, MethodChannel.MethodCallHandle
       Sensor.TYPE_MAGNETIC_FIELD -> magnetometerStreamHandler!!.setUpdateInterval(interval)
       Sensor.TYPE_GYROSCOPE -> gyroScopeStreamHandler!!.setUpdateInterval(interval)
       Sensor.TYPE_LINEAR_ACCELERATION -> userAccelerationStreamHandler!!.setUpdateInterval(interval)
-      Sensor.TYPE_GAME_ROTATION_VECTOR -> orientationStreamHandler!!.setUpdateInterval(interval)
-      Sensor.TYPE_ROTATION_VECTOR -> absoluteOrientationStreamHandler!!.setUpdateInterval(interval)
+      Sensor.TYPE_ORIENTATION -> orientationStreamHandler!!.setUpdateInterval(interval)
+      Sensor.TYPE_GAME_ROTATION_VECTOR -> gameRotationVectorStreamHandler!!.setUpdateInterval(interval)
+      Sensor.TYPE_ROTATION_VECTOR -> rotationVectorStreamHandler!!.setUpdateInterval(interval)
     }
   }
 }
@@ -166,6 +181,41 @@ class StreamHandlerImpl(private val sensorManager: SensorManager, sensorType: In
 }
 
 class RotationVectorStreamHandler(private val sensorManager: SensorManager, sensorType: Int, private var interval: Int = SensorManager.SENSOR_DELAY_NORMAL) :
+        EventChannel.StreamHandler, SensorEventListener {
+  private val sensor = sensorManager.getDefaultSensor(sensorType)
+  private var eventSink: EventChannel.EventSink? = null
+
+  override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+    if (sensor != null) {
+      eventSink = events
+      sensorManager.registerListener(this, sensor, interval)
+    }
+  }
+
+  override fun onCancel(arguments: Any?) {
+    sensorManager.unregisterListener(this)
+    eventSink = null
+  }
+
+  override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+
+  }
+
+  override fun onSensorChanged(event: SensorEvent?) {
+    val sensorValues = event!!.values.asList()
+    eventSink?.success(sensorValues)
+  }
+
+  fun setUpdateInterval(interval: Int) {
+    this.interval = interval
+    if (eventSink != null) {
+      sensorManager.unregisterListener(this)
+      sensorManager.registerListener(this, sensor, interval)
+    }
+  }
+}
+
+class OrientationStreamHandler(private val sensorManager: SensorManager, sensorType: Int, private var interval: Int = SensorManager.SENSOR_DELAY_NORMAL) :
         EventChannel.StreamHandler, SensorEventListener {
   private val sensor = sensorManager.getDefaultSensor(sensorType)
   private var eventSink: EventChannel.EventSink? = null
